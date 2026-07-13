@@ -2,8 +2,13 @@ package com.javarush.domain;
 
 import jakarta.persistence.*;
 
+/**
+ * Сущность (Entity), представляющая город в базе даннных world.
+ * Мапится на таблицу "city".
+ * Города связаны с таблицей стран {@link Country} через отношение Many-to-One.
+ */
 @Entity
-@Table(schema = "world", name="city")
+@Table(name="city")
 public class City {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

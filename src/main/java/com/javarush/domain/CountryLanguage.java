@@ -4,8 +4,13 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 
+/**
+ * Сущность (Entity), представляющая языки страны в базе даннных world.
+ * Мапится на таблицу "country_language".
+ * Языки страны связаны с таблицей стран {@link Country} через отношение Many-to-One.
+ */
 @Entity
-@Table(schema = "world", name = "country_language")
+@Table(name = "country_language")
 public class CountryLanguage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

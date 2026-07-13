@@ -4,8 +4,12 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 
+/**
+ * Сущность (Entity), представляющая страну в базе даннных world.
+ * Мапится на таблицу "country".
+ */
 @Entity
-@Table(schema ="world", name = "country")
+@Table(name = "country")
 public class Country {
     @Id
     @Column(name = "id", nullable = false)
