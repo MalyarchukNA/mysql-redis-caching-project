@@ -1,6 +1,10 @@
 package com.javarush.domain;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -9,6 +13,10 @@ import java.math.BigDecimal;
  * Мапится на таблицу "country_language".
  * Языки страны связаны с таблицей стран {@link Country} через отношение Many-to-One.
  */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "country_language")
 public class CountryLanguage {

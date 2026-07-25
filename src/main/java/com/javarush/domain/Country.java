@@ -1,13 +1,23 @@
 package com.javarush.domain;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 /**
  * Сущность (Entity), представляющая страну в базе даннных world.
  * Мапится на таблицу "country".
+ * Связана с таблицей языков {@link CountryLanguage} через отношение One-To-Many
  */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "country")
 public class Country {
@@ -58,8 +68,12 @@ public class Country {
     @Column(name = "head_of_state", length = 60)
     private String headOfState;
 
-    @OneToOne
+    @OneToOne (fetch = FetchType.LAZY)
     @JoinColumn(name = "capital")
     private City capital;
+
+    @OneToMany (fetch = FetchType.LAZY)
+    @JoinColumn(name = "country_id")
+    private Set<CountryLanguage> languages;
 
 }

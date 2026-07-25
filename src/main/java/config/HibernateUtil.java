@@ -3,11 +3,17 @@ package config;
 import com.javarush.domain.City;
 import com.javarush.domain.Country;
 import com.javarush.domain.CountryLanguage;
+import lombok.Getter;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 
-
+/**
+ * Утилитарный класс для работы с Hibernate SessionFactory.
+ * Инициализирует конфигурацию, регистрирует сущности и предоставляет
+ * доступ к сессиям для работы с базой данных.
+ */
 public class HibernateUtil {
+    @Getter
     private static final SessionFactory sessionFactory;
 
     static {
@@ -22,7 +28,4 @@ public class HibernateUtil {
         }
     }
 
-    public static SessionFactory getSessionFactory() {
-        return sessionFactory;
-    }
 }
