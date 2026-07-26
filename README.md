@@ -13,6 +13,8 @@ The goal is to optimize database performance by caching frequently requested dat
 6. Docker - для контейнеризации (Redis и MySQL).
 7. Lombok - для генерации boilerplate-кода.
 8. Redis - для кэширования данных (in-memory хранилище).
+9. Lettuce - Redis клиент.
+10. Jackson - сериализация объектов в JSON.
 
 ## *2. Функционал*
 
@@ -36,6 +38,10 @@ cd mysql-redis-caching-project
 Запустите контейнер с MySQL, выполнив следующую команду в терминале:
 ```bash
 docker run --name mysql -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root --restart unless-stopped -v mysql:/var/lib/mysql mysql:8
+```
+Запустите Redis-сервер как докер контейнер:
+```bash
+docker run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
 ```
 
 ### 3.3 Развертывание дампа базы данных
