@@ -1,4 +1,4 @@
-package config;
+package com.javarush.config;
 
 import com.javarush.domain.City;
 import com.javarush.domain.Country;

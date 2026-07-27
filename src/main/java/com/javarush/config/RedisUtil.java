@@ -1,4 +1,4 @@
-package config;
+package com.javarush.config;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
