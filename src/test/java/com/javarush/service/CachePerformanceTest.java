@@ -1,4 +1,4 @@
-package com.javarush.app;
+package com.javarush.service;
 
 import com.javarush.config.HibernateUtil;
 import com.javarush.config.RedisUtil;
@@ -6,7 +6,6 @@ import com.javarush.dao.CityDao;
 import com.javarush.dao.CountryDao;
 import com.javarush.domain.City;
 import com.javarush.domain.Country;
-import com.javarush.domain.CountryLanguage;
 import com.javarush.redis.CityDetail;
 import com.javarush.redis.Language;
 import io.lettuce.core.RedisClient;
@@ -15,6 +14,9 @@ import io.lettuce.core.api.sync.RedisStringCommands;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -25,73 +27,30 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
- * Сервис для подготовки данных, кэширования сущностей {@link City} в Redis
- * и замера производительности чтения из MySQL по сравнению с Redis.
+ * Интеграционный тест для замера производительности чтения сущностей {@link City}
+ * из базы данных MySQL по сравнению скэшем в  Redis.
  */
-public class CachePerformanceService {
-    private final SessionFactory sessionFactory;
-    private final CityDao cityDao;
-    private final CountryDao countryDao;
-    private final RedisClient redisClient;
-    private final ObjectMapper mapper;
+public class CachePerformanceTest {
+    private static SessionFactory sessionFactory;
+    private static CityDao cityDao;
+    private static CountryDao countryDao;
+    private static RedisClient redisClient;
+    private static ObjectMapper mapper;
 
-    public CachePerformanceService(){
-        this.sessionFactory = HibernateUtil.getSessionFactory();
-        this.cityDao = new CityDao(sessionFactory);
-        this.countryDao = new CountryDao(sessionFactory);
-        this.redisClient =  RedisUtil.getRedisClient();
-        this.mapper = new ObjectMapper();
-    }
+    private static List<Integer> ids;
 
     /**
-     * Замерят скорость чтения данных из Redis.
-     * Извлекает данные городов из Redis по списку идентификаторов
-     * и десериализует их из формата JSON обратно в объекты {@link CityDetail}.
-     *
-     * @param ids список идентификаторов городов для поиска в кэше
-     * @return время работы в миллисекундах
+     * Инициализирует окружение, выгружает данные из MySQL, преобразует их,
+     * кэширует в Redis и генерирует набор случайных идентификаторов перед выполнением тестов.
      */
-    public long measureRedisPerformance(List<Integer> ids){
-        long startTime = System.currentTimeMillis();
-        try(StatefulRedisConnection<String, String> connection = redisClient.connect()){
-            RedisStringCommands<String, String> sync = connection.sync();
-            for (Integer id: ids){
-                String key = "city:" + String.valueOf(id);
-                String value = sync.get(key);
-                mapper.readValue(value, CityDetail.class);
-            }
-        } catch (JacksonException e){
-            //TODO: добавить в логгер
-            e.printStackTrace();
-        }
-        return System.currentTimeMillis() - startTime;
-    }
+    @BeforeAll
+    static void setup(){
+        sessionFactory = HibernateUtil.getSessionFactory();
+        cityDao = new CityDao(sessionFactory);
+        countryDao = new CountryDao(sessionFactory);
+        redisClient =  RedisUtil.getRedisClient();
+        mapper = new ObjectMapper();
 
-    /**
-     * Замерят скорость чтения данных из MySQL.
-     * Извлекает данные городов из базы данных по списку идентификаторов
-     *
-     * @param ids список идентификаторов городов для поиска в базе данных
-     * @return время работы в миллисекундах
-     */
-    public long measureMySqlPerformance(List<Integer> ids){
-        long startTime = System.currentTimeMillis();
-        try(Session session = sessionFactory.getCurrentSession()){
-            session.beginTransaction();
-            for (Integer id: ids){
-                City city = cityDao.getById(id);
-                Set<CountryLanguage> languages = city.getCountry().getLanguages();
-
-            }
-            session.getTransaction().commit();
-        }
-        return System.currentTimeMillis() - startTime;
-    }
-
-    /**
-     * Выполняет полный цикл подготовки данных: выгрузка из MySQL, маппинг и кэширование в Redis.
-     */
-    public void prepareAndCacheData(){
         Statistics stats = sessionFactory.getStatistics();
         stats.setStatisticsEnabled(true);
 
@@ -100,14 +59,72 @@ public class CachePerformanceService {
 
         List<CityDetail> preparedCities = prepareData(cities);
         pushToRedis(preparedCities);
+
+        ids = generateRandomIds(1000);
+    }
+
+    /**
+     * Тест производительности чтения данных из Redis.
+     * Последовательно запрашивает случайные города по списку идентификаторов
+     * и десериализует JSON в {@link CityDetail}.
+     */
+    @Test
+    void measureRedisPerformance(){
+        long startTime = System.currentTimeMillis();
+        try (StatefulRedisConnection<String, String> connection = redisClient.connect()){
+            RedisStringCommands<String, String> sync = connection.sync();
+            for (Integer id: ids){
+                String key = "city:" + id;
+                String value = sync.get(key);
+                mapper.readValue(value, CityDetail.class);
+            }
+        } catch (JacksonException e){
+            //TODO: добавить в логгер
+            e.printStackTrace();
+        }
+        long duration = System.currentTimeMillis() - startTime;
+        System.out.printf("%s:\t%d ms\n", "Redis", duration);
+    }
+
+    /**
+     * Тест производительности чтения данных из MySQL.
+     * Последовательно запрашивает случайные города по списку идентификаторов из базы данных вместе со связанными языками.
+     */
+    @Test
+    void measureMySqlPerformance() {
+        long startTime = System.currentTimeMillis();
+        try (Session session = sessionFactory.getCurrentSession()) {
+            session.beginTransaction();
+            for (Integer id : ids) {
+                City city = cityDao.getById(id);
+                city.getCountry().getLanguages().size();
+
+            }
+            session.getTransaction().commit();
+        }
+        long duration = System.currentTimeMillis() - startTime;
+        System.out.printf("%s:\t%d ms\n", "MySQL", duration);
+    }
+
+    /**
+     * Корректно завершает работу sessionFactory, Hibernate и Redis после завершения всех тестов.
+     */
+    @AfterAll
+    static void tearDown(){
+        if (sessionFactory != null && !sessionFactory.isClosed()){
+            sessionFactory.close();
+        }
+        HibernateUtil.shutdown();
+        RedisUtil.shutdown();
     }
 
     /**
      * Извлекает из базы данных список всех сущностей {@link City}.
      * Предварительно подгружает список стран {@link Country}.
+     *
      * @return список объектов {@link City}
      */
-    private List<City> fetchAllCities(){
+    private static List<City> fetchAllCities(){
         try(Session session = sessionFactory.getCurrentSession()){
             session.beginTransaction();
             List<Country> countries = countryDao.getAll();
@@ -124,10 +141,11 @@ public class CachePerformanceService {
 
     /**
      * Мапит список сущностей {@link City} в список объектов {@link CityDetail} для передачи в Redis.
+     *
      * @param cities список городов из базы данных
      * @return список объектов {@link CityDetail}
      */
-    private List<CityDetail> prepareData(List<City> cities){
+    private static List<CityDetail> prepareData(List<City> cities){
         return cities.stream().map(city -> {
                     CityDetail cityDetail = new CityDetail();
                     cityDetail.setId(city.getId());
@@ -160,15 +178,15 @@ public class CachePerformanceService {
 
 
     /**
-     * Записывает в Redis сущности из списка {@link CityDetail}
+     * Сериализует подготовленные объекты в формат JSON и записывает их в Redis.
      * @param preparedCities список подготовленных городов в формате частого запроса для сохранения
      */
-    private void pushToRedis(List<CityDetail> preparedCities){
+    private static void pushToRedis(List<CityDetail> preparedCities){
         try (StatefulRedisConnection<String, String> connection = redisClient.connect()) {
             RedisStringCommands<String, String> sync = connection.sync();
             for (CityDetail city: preparedCities){
                 try {
-                    String key = "city:" + String.valueOf(city.getId());
+                    String key = "city:" + city.getId();
                     String value = mapper.writeValueAsString(city);
                     sync.set(key, value);
                 } catch (JacksonException e) {
@@ -181,8 +199,11 @@ public class CachePerformanceService {
 
     /**
      * Генерирует список из count случайных ID на основе реально существующих в базе.
+     *
+     * @param count размер генерируемого списка ID
+     * @return список случайных числовых идентификаторов
      */
-    public List<Integer> generateRandomIds(int count) {
+    public static List<Integer> generateRandomIds(int count) {
         List<Integer> result = new ArrayList<>(count);
 
         try(Session session = sessionFactory.getCurrentSession()) {
@@ -199,17 +220,6 @@ public class CachePerformanceService {
             session.getTransaction().commit();
         }
         return result;
-    }
-
-    /**
-     * Корректно завершает работу sessionFactory, Hibernate и Redis
-     */
-    public void shutdown(){
-        if (sessionFactory != null && !sessionFactory.isClosed()){
-            sessionFactory.close();
-        }
-        HibernateUtil.shutdown();
-        RedisUtil.shutdown();
     }
 
 }

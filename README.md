@@ -15,6 +15,7 @@ The goal is to optimize database performance by caching frequently requested dat
 8. Redis - для кэширования данных (in-memory хранилище).
 9. Lettuce - Redis клиент.
 10. Jackson - сериализация объектов в JSON.
+11. JUnit 5 (Jupiter API) - тесты.
 
 ## *2. Функционал*
 
