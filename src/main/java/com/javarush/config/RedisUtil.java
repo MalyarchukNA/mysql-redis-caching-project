@@ -2,6 +2,8 @@ package com.javarush.config;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,16 +16,18 @@ import java.util.Properties;
  */
 public class RedisUtil {
     private static final RedisClient redisClient;
+    private static final Logger logger = LoggerFactory.getLogger(RedisUtil.class);
 
     static {
         Properties properties = new Properties();
         try(InputStream inputStream = RedisUtil.class.getClassLoader().getResourceAsStream("redis.properties")) {
             if (inputStream != null){
                 properties.load(inputStream);
+            } else {
+                logger.warn("Файл redis.properties не найден в ресурсах. Будут использованы настройки по умолчанию.");
             }
         } catch (IOException e) {
-            //TODO: добавить в логгер
-            e.printStackTrace();
+            logger.error("Ошибка при чтении файла конфигурации redis.properties", e);
         }
 
         String host = properties.getProperty("redis.host", "localhost");
@@ -35,6 +39,7 @@ public class RedisUtil {
                 .build();
 
         redisClient = RedisClient.create(redisURI);
+        logger.info("RedisClient создан.");
     }
 
     public static RedisClient getRedisClient() {
@@ -44,6 +49,7 @@ public class RedisUtil {
     public static void shutdown(){
         if (redisClient != null){
             redisClient.shutdown();
+            logger.info("Redis клиент остановлен.");
         }
     }
 }

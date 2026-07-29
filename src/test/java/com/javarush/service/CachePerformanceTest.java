@@ -16,7 +16,10 @@ import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -39,6 +42,8 @@ public class CachePerformanceTest {
 
     private static List<Integer> ids;
 
+    private static final Logger logger = LoggerFactory.getLogger(CachePerformanceTest.class);
+
     /**
      * Инициализирует окружение, выгружает данные из MySQL, преобразует их,
      * кэширует в Redis и генерирует набор случайных идентификаторов перед выполнением тестов.
@@ -55,12 +60,13 @@ public class CachePerformanceTest {
         stats.setStatisticsEnabled(true);
 
         List<City> cities = fetchAllCities();
-        System.out.println("Количество SQL-запросов к БД: " + stats.getPrepareStatementCount());
+        logger.info("Количество SQL-запросов к БД: {}", stats.getPrepareStatementCount());
 
         List<CityDetail> preparedCities = prepareData(cities);
         pushToRedis(preparedCities);
 
         ids = generateRandomIds(1000);
+        logger.info("Тестовое окружение настроено.");
     }
 
     /**
@@ -69,6 +75,7 @@ public class CachePerformanceTest {
      * и десериализует JSON в {@link CityDetail}.
      */
     @Test
+    @DisplayName("Бенчмарк: чтение городов из кэша Redis")
     void measureRedisPerformance(){
         long startTime = System.currentTimeMillis();
         try (StatefulRedisConnection<String, String> connection = redisClient.connect()){
@@ -79,11 +86,10 @@ public class CachePerformanceTest {
                 mapper.readValue(value, CityDetail.class);
             }
         } catch (JacksonException e){
-            //TODO: добавить в логгер
-            e.printStackTrace();
+            logger.error("Ошибка сериализации/десериализации данных при чтении из Redis", e);
         }
         long duration = System.currentTimeMillis() - startTime;
-        System.out.printf("%s:\t%d ms\n", "Redis", duration);
+        logger.info("Результат бенчмарка Redis: {} ms", duration);
     }
 
     /**
@@ -91,6 +97,7 @@ public class CachePerformanceTest {
      * Последовательно запрашивает случайные города по списку идентификаторов из базы данных вместе со связанными языками.
      */
     @Test
+    @DisplayName("Бенчмарк: чтение городов из MySQL")
     void measureMySqlPerformance() {
         long startTime = System.currentTimeMillis();
         try (Session session = sessionFactory.getCurrentSession()) {
@@ -103,7 +110,7 @@ public class CachePerformanceTest {
             session.getTransaction().commit();
         }
         long duration = System.currentTimeMillis() - startTime;
-        System.out.printf("%s:\t%d ms\n", "MySQL", duration);
+        logger.info("Результат бенчмарка MySQL: {} ms", duration);
     }
 
     /**
@@ -111,11 +118,9 @@ public class CachePerformanceTest {
      */
     @AfterAll
     static void tearDown(){
-        if (sessionFactory != null && !sessionFactory.isClosed()){
-            sessionFactory.close();
-        }
         HibernateUtil.shutdown();
         RedisUtil.shutdown();
+        logger.info("Все ресурсы освобождены.");
     }
 
     /**
@@ -190,11 +195,11 @@ public class CachePerformanceTest {
                     String value = mapper.writeValueAsString(city);
                     sync.set(key, value);
                 } catch (JacksonException e) {
-                    //TODO: добавить в логгер
-                    e.printStackTrace();
+                    logger.error("Ошибка сериализации города с ID: {} для записи в Redis", city.getId(), e);
                 }
             }
         }
+        logger.info("Данные выгружены в Redis.");
     }
 
     /**
